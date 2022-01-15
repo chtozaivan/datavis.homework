@@ -17,7 +17,7 @@ const scatterPlot  = d3.select('#scatter-plot')
 const lineChart = d3.select('#line-chart')
             .attr('width', width)
             .attr('height', height);
-
+        
 let xParam = 'fertility-rate';
 let yParam = 'child-mortality';
 let rParam = 'gdp';
@@ -26,6 +26,7 @@ let param = 'child-mortality';
 let lineParam = 'gdp';
 let highlighted = '';
 let selected;
+
 
 const x = d3.scaleLinear().range([margin*2, width-margin]);
 const y = d3.scaleLinear().range([height-margin, margin]);
@@ -46,29 +47,28 @@ const colorScale = d3.scaleOrdinal().range(['#DD4949', '#39CDA1', '#FD710C', '#A
 const radiusScale = d3.scaleSqrt().range([10, 30]);
 
 loadData().then(data => {
-
     colorScale.domain(d3.set(data.map(d=>d.region)).values());
-
+    
     d3.select('#range').on('change', function(){ 
         year = d3.select(this).property('value');
         yearLable.html(year);
-        updateScattePlot();
+        updateScatterPlot();
         updateBar();
     });
 
     d3.select('#radius').on('change', function(){ 
         rParam = d3.select(this).property('value');
-        updateScattePlot();
+        updateScatterPlot();
     });
 
-    d3.select('#x').on('change', function(){ 
+    d3.select('#x').on('change', function(){
         xParam = d3.select(this).property('value');
-        updateScattePlot();
+        updateScatterPlot();
     });
 
     d3.select('#y').on('change', function(){ 
         yParam = d3.select(this).property('value');
-        updateScattePlot();
+        updateScatterPlot();
     });
 
     d3.select('#param').on('change', function(){ 
@@ -77,15 +77,65 @@ loadData().then(data => {
     });
 
     function updateBar(){
-        return;
+        const barData = d3.nest()
+            .key(d => d.region)
+            .rollup(leaves => {
+                return d3.mean(leaves.map(d=> Number(d[param][year])))
+            })
+            .entries(data);
+        console.log(barData);
+        
+        xBar.domain(barData.map(d => d.key));
+        yBar.domain(d3.extent(barData.map(d => d.value)));
+        const selection = barChart.selectAll('rect').data(barData);
+
+        const bars = selection.enter().append('rect');
+
+        selection.merge(bars)
+            .attr('x', d => xBar(d.key))
+            .attr('y', d => yBar(d.value))
+            .attr('fill', d => colorScale(d.key))
+            .attr('height', d => height - yBar(d.value))
+            .attr('width', 100);
     }
 
-    function updateScattePlot(){
-        return;
+    function updateScatterPlot(){
+        const xValues = data.map(d => Number(d[xParam][year])); // массив
+        const xDomain = d3.extent(xValues); // [min, max]
+        x.domain(xDomain); // [min, max] по xParam
+
+        const yValues = data.map(d => Number(d[yParam][year])); // массив
+        const yDomain = d3.extent(yValues); // [min, max]
+        y.domain(yDomain); // [min, max] по xParam
+
+        const selection = scatterPlot.selectAll('circle').data(data); 
+        // [] [DATA1, DATA2]
+        // enter: [circle, circle]
+        // update: []
+
+        // [circle, circle] [DATA1, DATA2]
+        // enter: []
+        // update: [circle, circle]
+
+        var rValues = data.map(d => Number(d[rParam][year]));
+		var r_arr = data.map(d => Number(d[rParam][year]));
+		var min_r = Math.min.apply(Math, r_arr)
+		var max_r = Math.max.apply(Math, r_arr)
+		radiusScale.domain([min_r, max_r]);
+            
+        const circles = selection.enter()
+                .append('circle'); /*создаем элементы*/
+
+        selection.merge(circles)
+                //.attr('r', 50)
+                .attr("r", d => radiusScale(d[rParam][year]))
+                .attr('cx', d => x(Number(d[xParam][year])))
+                .attr('cy', d => y(Number(d[yParam][year])))
+                .attr('fill', d => colorScale(d.region));
     }
 
     updateBar();
-    updateScattePlot();
+    updateScatterPlot();
 });
 
 
